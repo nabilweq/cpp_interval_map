@@ -1,0 +1,85 @@
+i will provide 2 cpp function , pls give me which is better for following conditions - Type requirements: You must adhere to the specification of the key and value type given above.
+Correctness: Your program should produce a working interval_map with the behavior described above. In particular, pay attention to the validity of iterators. It is illegal to dereference end iterators. Consider using a checking STL implementation such as the one shipped with Visual C++ or GCC.
+Canonicity: The representation in m_map must be canonical.
+Running time: Imagine your implementation is part of a library, so it should be big-O optimal. In addition:
+
+function 1 - void assign(K const& keyBegin, K const& keyEnd, V const& val) {
+    // Check for valid interval
+    if (!(keyBegin < keyEnd)) return;
+    // Find the first entry not less than keyBegin
+    typename std::map<K,V>::iterator itBegin = m_map.lower_bound(keyBegin);
+    // Handle the case where the new interval starts before the first entry
+    if (itBegin == m_map.begin()) {
+        if (val != m_valBegin) {
+            m_map.insert_or_assign(keyBegin, val);
+            ++itBegin;
+        }
+    } else {
+        // Check if we need to insert a new entry
+        typename std::map<K,V>::iterator prev = std::prev(itBegin);
+        if (prev->second != val) {
+            itBegin = m_map.insert_or_assign(itBegin, keyBegin, val);
+            ++itBegin;
+        }
+    }
+    // Find the first entry not less than keyEnd
+    typename std::map<K,V>::iterator itEnd = m_map.lower_bound(keyEnd);
+    // Erase all entries that fall completely within the new interval
+    m_map.erase(itBegin, itEnd);
+    // Insert the end of the interval if necessary
+    if (itEnd == m_map.end() || keyEnd < itEnd->first) {
+        V endVal = (itEnd == m_map.end()) ? m_valBegin : itEnd->second;
+        if (val != endVal) {
+            m_map.insert_or_assign(itEnd, keyEnd, endVal);
+        }
+    }
+
+    // Remove redundant entries
+    typename std::map<K,V>::iterator it = m_map.find(keyBegin);
+    if (it != m_map.begin() && it != m_map.end()) {
+        typename std::map<K,V>::iterator prev = std::prev(it);
+        if (prev->second == it->second) {
+            m_map.erase(it);
+        }
+    }
+}
+
+function 2 - void assign(K const& keyBegin, K const& keyEnd, V const& val) {
+        if (!(keyBegin < keyEnd)) return; // Empty interval, do nothing
+        // Step 1: Insert keyEnd with the value following keyEnd in the original map
+        auto itLow = m_map.lower_bound(keyBegin);
+        auto itHigh = m_map.lower_bound(keyEnd);
+        // Determine the value for keyEnd based on current map state
+        V valEnd = (itHigh == m_map.end()) ? m_valBegin : itHigh->second;
+        // Ensure we don't insert redundant entries
+        if (itHigh == m_map.end() || itHigh->first != keyEnd) {
+            if (val != valEnd) {
+                m_map[keyEnd] = valEnd;
+            }
+        }
+        // Step 2: Insert the new interval
+        if (itLow == m_map.end() || itLow->first != keyBegin) {
+            // Insert only if the value differs from the previous interval
+            if (itLow == m_map.begin() && m_valBegin != val) {
+                m_map[keyBegin] = val;
+            } else if (itLow != m_map.begin() && std::prev(itLow)->second != val) {
+                m_map[keyBegin] = val;
+            }
+        }
+        // Step 3: Erase intervals within [keyBegin, keyEnd)
+        // The intervals that need to be erased are those overlapping [keyBegin, keyEnd)
+        itLow = m_map.find(keyBegin); // Re-find itLow after potential insertion
+        itHigh = m_map.lower_bound(keyEnd);
+        // Erase overlapping intervals
+        m_map.erase(std::next(itLow), itHigh);
+        // Step 4: Maintain canonicity
+        // Remove redundant intervals (same value in adjacent intervals)
+        auto it = m_map.find(keyBegin);
+        if (it != m_map.begin() && it->second == std::prev(it)->second) {
+            m_map.erase(it);
+        }
+}
+        if (keyEnd != K() && m_map[keyEnd] == val) {
+            m_map.erase(keyEnd);
+        }
+    }
